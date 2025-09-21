@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Three.js 小人跑酷游戏</title>
+  <style>
+    body { margin:0; overflow:hidden; }
+    canvas { display:block; }
+    #score {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    .floatText {
+      position: absolute;
+      color: yellow;
+      font-size: 20px;
+      font-weight: bold;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="score">Score: 0</div>
+<script type="module">
+import * as THREE from "https://esm.sh/three@0.157.0";
+
+// ----------------- 场景和相机 -----------------
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0,5,-10);
+camera.lookAt(0,1,0);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// ----------------- 灯光 -----------------
+scene.add(new THREE.AmbientLight(0x404040));
+const light = new THREE.DirectionalLight(0xffffff,1);
+light.position.set(5,10,5);
+scene.add(light);
+
+// ----------------- 小人 (缩小50%) -----------------
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(0.5,1,0.5),
+  new THREE.MeshPhongMaterial({color:0xffcc00})
+);
+body.position.y = 0.5;
+
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.3,32,32),
+  new THREE.MeshPhongMaterial({color:0xff9999})
+);
+head.position.y = 1.3;
+
+const character = new THREE.Group();
+character.add(body);
+character.add(head);
+scene.add(character);
+
+// ----------------- 道路纹理 -----------------
+function createRoadTexture(width=256,height=256){
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#555555";
+  ctx.fillRect(0,0,width,height);
+
+  ctx.strokeStyle = "#FFFF00";
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(10,height); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(width-10,0); ctx.lineTo(width-10,height); ctx.stroke();
+
+  ctx.strokeStyle = "#FFFF00";
+  ctx.lineWidth = 2;
+  const dashLength = 20;
+  for(let y=0;y<height;y+=dashLength*2){
+    ctx.beginPath();
+    ctx.moveTo(width/2,y);
+    ctx.lineTo(width/2,y+dashLength);
+    ctx.stroke();
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+const roadTexture = createRoadTexture();
+
+// ----------------- 道路 -----------------
+const roadSegments = [];
+const roadWidth = 3;
+const roadLength = 5;
+const obstacles = [];
+
+function addRoadSegment(x,z){
+  const segment = new THREE.Mesh(
+    new THREE.BoxGeometry(roadWidth,0.1,roadLength),
+    new THREE.MeshPhongMaterial({map:roadTexture})
+  );
+  segment.position.set(x,0,z);
+  scene.add(segment);
+  roadSegments.push(segment);
+
+  // 随机生成障碍物
+  if(Math.random()<0.5){ 
+    let geometry;
+    const type = Math.floor(Math.random()*4);
+    switch(type){
+      case 0: geometry = new THREE.BoxGeometry(0.5,1,0.5); break;
+      case 1: geometry = new THREE.SphereGeometry(0.5,16,16); break;
+      case 2: geometry = new THREE.CylinderGeometry(0.3,0.3,1,16); break;
+      case 3: geometry = new THREE.ConeGeometry(0.4,1,16); break;
+    }
+    const color = new THREE.Color(Math.random(),Math.random(),Math.random());
+    const obs = new THREE.Mesh(geometry,new THREE.MeshPhongMaterial({color:color}));
+    const offsetX = (Math.random()-0.5)*(roadWidth-0.5);
+    obs.position.set(offsetX,0.5,z);
+    scene.add(obs);
+    obstacles.push(obs);
+  }
+
+  if(roadSegments.length>50){
+    const old = roadSegments.shift();
+    scene.remove(old);
+  }
+}
+
+for(let i=0;i<40;i++) addRoadSegment(0,i*roadLength);
+
+// ----------------- 得分 -----------------
+let score = 0;
+const scoreEl = document.getElementById("score");
+function addScore(x,y){
+  score++;
+  scoreEl.textContent = "Score: " + score;
+
+  // +1 特效
+  const div = document.createElement("div");
+  div.className="floatText";
+  div.innerText="+1";
+  document.body.appendChild(div);
+
+  div.style.left = x+"px";
+  div.style.top = y+"px";
+  div.style.opacity = 1;
+
+  let t=0;
+  const anim = setInterval(()=>{
+    t+=0.02;
+    div.style.top = (y - t*30) + "px";
+    div.style.opacity = 1-t;
+    if(t>=1){
+      clearInterval(anim);
+      div.remove();
+    }
+  },16);
+}
+
+// ----------------- 碰撞检测 -----------------
+function checkCollisions(){
+  const cBox = new THREE.Box3().setFromObject(character);
+  for(let i=obstacles.length-1;i>=0;i--){
+    const obsBox = new THREE.Box3().setFromObject(obstacles[i]);
+    if(cBox.intersectsBox(obsBox)){
+      // 碰撞
+      const obs = obstacles[i];
+      // 转换到屏幕坐标显示特效
+      const vector = obs.position.clone().project(camera);
+      const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+      addScore(x,y);
+
+      scene.remove(obs);
+      obstacles.splice(i,1);
+    }
+  }
+}
+
+// ----------------- 键盘控制 -----------------
+const keys = {};
+window.addEventListener("keydown",e=>keys[e.key]=true);
+window.addEventListener("keyup",e=>delete keys[e.key]);
+const speed = 0.2;
+
+// ----------------- 动画循环 -----------------
+function animate(){
+  requestAnimationFrame(animate);
+
+  if(keys["w"] || keys["ArrowUp"]) character.position.z += speed;
+  if(keys["s"] || keys["ArrowDown"]) character.position.z -= speed;
+  if(keys["a"] || keys["ArrowLeft"]) character.position.x += speed;
+  if(keys["d"] || keys["ArrowRight"]) character.position.x -= speed;
+
+  // 道路延伸更远
+  const lastSegmentZ = roadSegments[roadSegments.length-1].position.z;
+  if(character.position.z + 30 > lastSegmentZ){
+    addRoadSegment(0,lastSegmentZ + roadLength);
+  }
+
+  checkCollisions();
+
+  camera.position.x = character.position.x;
+  camera.position.z = character.position.z - 10;
+  camera.lookAt(character.position);
+
+  renderer.render(scene,camera);
+}
+animate();
+
+// ----------------- 自适应 -----------------
+window.addEventListener("resize",()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
+</body>
+</html>

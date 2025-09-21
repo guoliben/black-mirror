@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>虚拟小镇 - OSM + 全景街景 Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    body { margin:0; padding:0; display:flex; height:100vh; }
+    #map { width: 50%; height: 100vh; }
+    #streetview { width: 50%; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="streetview"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Mapillary JS -->
+  <script src="https://unpkg.com/mapillary-js/dist/mapillary.min.js"></script>
+
+  <script>
+    // 初始化地图（上海市中心）
+    var map = L.map('map').setView([31.2304, 121.4737], 16);
+
+    // 加载 OSM 瓦片
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
+    }).addTo(map);
+
+    // 示例 POI（外滩附近）
+    var marker = L.marker([31.2404, 121.4900]).addTo(map);
+    marker.bindPopup("点击进入街景").openPopup();
+
+    // 初始化 Mapillary Viewer（右侧）
+    var viewer = new Mapillary.Viewer(
+      'streetview',
+      "YOUR_MAPILLARY_TOKEN", // ⚠️ 替换成你自己的 Mapillary token
+      null,
+      {
+        component: {
+          cover: false, // 关闭默认封面
+          navigation: true, // 显示导航箭头
+          direction: true   // 显示方向指示
+        }
+      }
+    );
+
+    // 点击地图上的标记 → 请求最近的街景图像 → 加载到 viewer
+    marker.on("click", function() {
+      var lng = 121.4900;
+      var lat = 31.2404;
+
+      var url = `https://graph.mapillary.com/images?access_token=YOUR_MAPILLARY_TOKEN&fields=id&closeto=${lng},${lat}&limit=1`;
+
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (data.data.length > 0) {
+            var imageId = data.data[0].id;
+            viewer.moveTo(imageId); // 加载街景 → 可拖动查看全景
+          } else {
+            alert("此位置没有街景数据！");
+          }
+        })
+        .catch(err => console.error("请求街景失败:", err));
+    });
+  </script>
+</body>
+</html>

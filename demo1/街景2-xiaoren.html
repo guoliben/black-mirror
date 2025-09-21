@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>虚拟小镇 - 玩家小人 Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { margin:0; padding:0; }
+    #map { width: 100%; height: 100vh; }
+    /* 小人图标 */
+    .player-icon {
+      width: 32px;
+      height: 32px;
+      background: url("https://cdn-icons-png.flaticon.com/512/147/147144.png") no-repeat center;
+      background-size: cover;
+      border-radius: 50%;
+      border: 2px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // 初始化地图
+    var map = L.map('map').setView([31.2304, 121.4737], 16);
+
+    // OSM 底图
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
+    }).addTo(map);
+
+    // 玩家小人图标
+    var playerIcon = L.divIcon({
+      className: "player-icon",
+      iconSize: [32, 32]
+    });
+
+    // 玩家初始位置
+    var player = L.marker([31.2304, 121.4737], { icon: playerIcon }).addTo(map);
+
+    // 控制移动（WASD / 方向键）
+    var step = 0.0003; // 移动步长（经纬度差值）
+    document.addEventListener("keydown", function(e) {
+      var pos = player.getLatLng();
+      switch(e.key) {
+        case "ArrowUp":
+        case "w":
+        case "W":
+          pos.lat += step; break;
+        case "ArrowDown":
+        case "s":
+        case "S":
+          pos.lat -= step; break;
+        case "ArrowLeft":
+        case "a":
+        case "A":
+          pos.lng -= step; break;
+        case "ArrowRight":
+        case "d":
+        case "D":
+          pos.lng += step; break;
+        default: return;
+      }
+      player.setLatLng(pos);
+      map.panTo(pos); // 移动时让地图跟随
+    });
+
+    // 在地图上加一个建筑 POI
+    var shop = L.marker([31.2314, 121.4737]).addTo(map);
+    shop.bindPopup("<b>小镇商店</b><br>点击进入小游戏!");
+  </script>
+</body>
+</html>

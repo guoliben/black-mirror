@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>虚拟小镇 - OSM + 街景 Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { margin:0; padding:0; display:flex; height:100vh; }
+    #map { width: 50%; height: 100vh; }
+    #streetview { width: 50%; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="streetview"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Mapillary JS -->
+  <script src="https://unpkg.com/mapillary-js/dist/mapillary.min.js"></script>
+
+  <script>
+    // 初始化地图（上海市中心）
+    var map = L.map('map').setView([31.2304, 121.4737], 16);
+
+    // 加载 OSM 瓦片
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
+    }).addTo(map);
+
+    // 示例建筑 POI
+    var marker = L.marker([31.2304, 121.4737]).addTo(map);
+    marker.bindPopup("点击进入街景").openPopup();
+
+    // 初始化 Mapillary 街景
+    var viewer = new Mapillary.Viewer(
+      'streetview',
+      "YOUR_MAPILLARY_TOKEN", // <-- 这里填你自己的 Mapillary Token
+      null,
+      {
+        component: { cover: false }
+      }
+    );
+
+    // 点击 POI → 加载街景
+    marker.on("click", function() {
+      // 使用 Mapillary API 找最近的街景图像
+      fetch(`https://graph.mapillary.com/images?access_token=YOUR_MAPILLARY_TOKEN&fields=id&closeto=121.4737,31.2304&limit=1`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.data.length > 0) {
+            var imageId = data.data[0].id;
+            viewer.moveTo(imageId);
+          } else {
+            alert("此位置没有街景数据！");
+          }
+        });
+    });
+  </script>
+</body>
+</html>
